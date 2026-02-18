@@ -34,3 +34,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database backups / storage artifacts
+*.bak
+*.trn
+*.dif
+*.mdf
+*.ndf
+*.ldf
+*.db
+*.sqlite
+*.sqlite3
+
+# local SQL Server demo artifacts
+/mcp-sqlserver/backups/
+/mcp-sqlserver/storage/
+/mcp-sqlserver/data/
+/mcp-sqlserver/.sqlserver/
