@@ -1,8 +1,92 @@
 # MCP + SQL Server Demo (Source-Backed Runbook)
 
-This folder contains a reproducible demo environment for validating SQL Server MCP workflows against AdventureWorks.
+Reproducible demo environment for validating SQL Server MCP workflows against `AdventureWorks2022`.
+![](docs/Gemini_Generated_Image_uejyzeuejyzeuejy.png)
+## Architecture at a Glance
 
-## Versions We Will Use (Pinned)
+### 1) Container View (High-Level)
+
+```mermaid
+flowchart TD
+  user[Developer / Analyst]
+  vscode[VS Code + Copilot Chat]
+  compose[Docker Compose]
+  docker[Docker Engine]
+  restore[restore-adventureworks.sh]
+  sql[SQL Server 2022 Container]
+  db[(AdventureWorks2022)]
+  assets[Demo Assets...]
+
+  user -->|Runs MCP-assisted workflow| vscode
+  vscode -->|Invokes setup commands| compose
+  compose -->|Starts container| docker
+  restore -->|RESTORE DATABASE via sqlcmd| sql
+  vscode -->|MCP MSSQL tools connect/list/query| sql
+  sql -->|Reads/writes local DB files| db
+  user -->|Follows runbook + prompts| assets
+  vscode -->|Opens docs + SQL files| assets
+```
+
+
+
+### 2) Component View (MCP Workflow)
+
+```mermaid
+flowchart TD
+  user[Developer / Analyst]
+  chat[VS Code + Copilot Chat]
+
+  subgraph workflow[MCP-Assisted SQL Workflow]
+    sd[Server Discovery\nmssql_list_servers]
+    cm[Connection Management\nmssql_connect / mssql_change_database / mssql_disconnect]
+    me[Metadata Explorer\nlist databases/schemas/tables/views/functions]
+    qr[Read-Only Query Runner\nmssql_run_query SELECT]
+    sc[Safety Controls\nread-only policy + operator guardrails]
+    rs[Insight Summarizer\nprompt-driven narrative output]
+  end
+
+  sql[(SQL Server 2022 + AdventureWorks2022)]
+  docs[(queries.sql + docs)]
+
+  user -->|Asks exploration questions| chat
+  chat -->|Starts discovery| sd
+  sd -->|Selects target server| cm
+  cm -->|Sets active database| me
+  me -->|Provides schema context| qr
+  sc -->|Constrains query behavior| qr
+  qr -->|Runs SQL + gets results| sql
+  me -->|Reads metadata catalogs| sql
+  qr -->|Passes result sets| rs
+  rs -->|Produces findings + next actions| user
+  rs -->|Uses prompts and templates| docs
+```
+
+
+## Quick Navigation
+
+- [MCP + SQL Server Demo (Source-Backed Runbook)](#mcp--sql-server-demo-source-backed-runbook)
+	- [Architecture at a Glance](#architecture-at-a-glance)
+		- [1) Container View (High-Level)](#1-container-view-high-level)
+		- [2) Component View (MCP Workflow)](#2-component-view-mcp-workflow)
+	- [Quick Navigation](#quick-navigation)
+	- [Versions (Pinned)](#versions-pinned)
+	- [Repository Files](#repository-files)
+	- [Prerequisites](#prerequisites)
+	- [Quick Start](#quick-start)
+		- [1) Create local env file](#1-create-local-env-file)
+		- [2) Set a strong SA password](#2-set-a-strong-sa-password)
+		- [3) Start SQL Server](#3-start-sql-server)
+		- [4) Restore AdventureWorks2022](#4-restore-adventureworks2022)
+		- [5) Verify database restore](#5-verify-database-restore)
+	- [MCP Tool Demo Flow](#mcp-tool-demo-flow)
+		- [Demo Query Pass](#demo-query-pass)
+		- [Close Safely](#close-safely)
+	- [Validation Checklist](#validation-checklist)
+	- [Troubleshooting (Basic)](#troubleshooting-basic)
+	- [Source References](#source-references)
+	- [Safety Notes](#safety-notes)
+
+## Versions (Pinned)
 
 As of 2026-02-17, this demo is pinned to the following:
 
@@ -14,10 +98,10 @@ As of 2026-02-17, this demo is pinned to the following:
 Why these choices:
 
 - Microsoft Learn quickstart explicitly targets SQL Server 2022 container workflows.
-- Docker/MCR listing shows CU tags and confirms required env vars (`ACCEPT_EULA`, `MSSQL_SA_PASSWORD`).
-- AdventureWorks page provides version-matched sample backups.
+- Docker/MCR listing confirms CU tags and required env vars (`ACCEPT_EULA`, `MSSQL_SA_PASSWORD`).
+- AdventureWorks guidance provides version-matched sample backups.
 
-## Included Files
+## Repository Files
 
 - `docker-compose.yml` - launches SQL Server with pinned image and persistent volume
 - `.env.example` - required env vars and password policy reminder
@@ -31,17 +115,17 @@ Why these choices:
 3. `curl` available for backup download.
 4. VS Code + SQL Server extension (`ms-mssql.mssql`) installed.
 
-## Setup Commands (Exact)
+## Quick Start
 
-Run from this folder (`mcp-sqlserver`).
+Run commands from `mcp-sqlserver`.
 
-1) Create local env file:
+### 1) Create local env file
 
 ```bash
 cp .env.example .env
 ```
 
-2) Edit `.env` and set a strong SA password:
+### 2) Set a strong SA password
 
 ```bash
 MSSQL_SA_PASSWORD='UseARealStrong!Pass123'
@@ -49,14 +133,14 @@ MSSQL_PID='Developer'
 MSSQL_HOST_PORT='1433'
 ```
 
-3) Start SQL Server:
+### 3) Start SQL Server
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-4) Restore AdventureWorks2022:
+### 4) Restore AdventureWorks2022
 
 ```bash
 set -a
@@ -65,7 +149,7 @@ set +a
 ./scripts/restore-adventureworks.sh
 ```
 
-5) Quick verification inside container:
+### 5) Verify database restore
 
 ```bash
 docker exec -it mcp-sqlserver-demo /opt/mssql-tools18/bin/sqlcmd \
@@ -78,8 +162,6 @@ docker exec -it mcp-sqlserver-demo /opt/mssql-tools18/bin/sqlcmd \
 Goal: prove connection, discovery, and read-only analytics end-to-end.
 
 Before running MCP commands, ensure your local SQL Server is registered in the MSSQL tooling profile list. If `mssql_list_servers` returns an empty list, create a local profile in the VS Code MSSQL extension first.
-
-## MCP Server Health Check (Explicit)
 
 Run these MCP actions in order:
 
@@ -102,27 +184,7 @@ Expected success signals:
 - AdventureWorks schemas include `Sales`, `Production`, `Person`, and `HumanResources`.
 - Table/view/function lists return non-empty result sets.
 
-### 1) Connect and inspect server
-
-- `mssql_list_servers`
-- `mssql_connect`
-- `mssql_get_connection_details`
-- `mssql_list_databases`
-
-Expected: valid connection ID and visible `AdventureWorks2022` database.
-
-### 2) Explore schema
-
-- `mssql_change_database` to `AdventureWorks2022`
-- `mssql_list_schemas`
-- `mssql_list_tables`
-- `mssql_list_views`
-- `mssql_list_functions`
-- `mssql_show_schema`
-
-Expected: key domains available (`Sales`, `Production`, `Person`, `HumanResources`).
-
-### 3) Run business analysis queries
+### Demo Query Pass
 
 Use statements from `queries.sql` with `mssql_run_query`:
 
@@ -132,7 +194,7 @@ Use statements from `queries.sql` with `mssql_run_query`:
 
 Expected: result sets return successfully with useful aggregate metrics.
 
-### 4) Close safely
+### Close Safely
 
 - Keep demo read-only (`SELECT` only in public walkthrough)
 - End session with `mssql_disconnect`

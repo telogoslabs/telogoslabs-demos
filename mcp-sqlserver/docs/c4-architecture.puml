@@ -1,0 +1,70 @@
+' C4 diagrams for MCP + SQL Server demo
+' Render with PlantUML plugin or CLI
+
+@startuml MCP_SQLServer_Container_View
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title MCP + SQL Server Demo - Container View
+
+Person(user, "Developer / Analyst", "Runs the demo and asks business questions")
+System_Ext(vscode, "VS Code + Copilot Chat", "Hosts MCP tool calls")
+System_Ext(docker, "Docker Engine", "Runs local containers")
+
+System_Boundary(local_demo, "Local Demo Workspace (mcp-sqlserver)") {
+  Container(compose, "Docker Compose", "Compose", "Bootstraps SQL Server container")
+  Container(script_restore, "Restore Script", "Bash", "Downloads and restores AdventureWorks2022 backup")
+  Container(sql_container, "SQL Server 2022 Container", "SQL Server on Linux", "Executes queries and serves metadata")
+  ContainerDb(adventureworks, "AdventureWorks2022", "SQL Server Database", "Sample business dataset")
+  Container(sql_assets, "Demo SQL Assets", "SQL/Markdown", "queries.sql, runbook, prompts, onboarding brief")
+}
+
+Rel(user, vscode, "Runs MCP-assisted workflow in editor")
+Rel(vscode, compose, "Invokes setup commands")
+Rel(compose, docker, "Starts container")
+Rel(script_restore, sql_container, "RESTORE DATABASE via sqlcmd")
+Rel(vscode, sql_container, "Uses MCP MSSQL tools (connect, list, query)")
+Rel(sql_container, adventureworks, "Reads/writes local DB files")
+Rel(user, sql_assets, "Follows demo script and queries")
+Rel(vscode, sql_assets, "Opens docs and SQL files")
+
+Lay_R(vscode, local_demo)
+Lay_D(local_demo, docker)
+
+SHOW_LEGEND()
+@enduml
+
+
+@startuml MCP_SQLServer_Component_View
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title MCP + SQL Server Demo - Component View
+
+Person(user, "Developer / Analyst", "Runs guided prompts")
+System_Ext(vscode, "VS Code + Copilot Chat", "Orchestrates MCP tool calls")
+
+Container_Boundary(mcp_flow, "MCP-Assisted SQL Workflow") {
+  Component(server_discovery, "Server Discovery", "mssql_list_servers", "Finds configured SQL Server profiles")
+  Component(connection_mgmt, "Connection Management", "mssql_connect / mssql_change_database / mssql_disconnect", "Creates and switches DB sessions")
+  Component(metadata_explorer, "Metadata Explorer", "mssql_list_databases/schemas/tables/views/functions", "Builds schema map and domain context")
+  Component(query_runner, "Read-Only Query Runner", "mssql_run_query (SELECT)", "Executes business analysis queries")
+  Component(safety_controls, "Safety Controls", "Session policy + operator practice", "Keeps demo non-destructive and read-only")
+  Component(reporting_layer, "Insight Summarizer", "Prompt + narrative", "Converts results into onboarding/business insights")
+}
+
+ContainerDb(sql_engine, "SQL Server 2022 + AdventureWorks2022", "Database Engine", "Stores schema and business data")
+Container(demo_artifacts, "Demo Artifacts", "queries.sql + docs", "Reusable prompts, runbook, and diagnostics")
+
+Rel(user, vscode, "Asks exploration and analysis questions")
+Rel(vscode, server_discovery, "Starts discovery")
+Rel(server_discovery, connection_mgmt, "Selects target server")
+Rel(connection_mgmt, metadata_explorer, "Sets active database")
+Rel(metadata_explorer, query_runner, "Provides table/schema context")
+Rel(safety_controls, query_runner, "Constrains to read-only usage")
+Rel(query_runner, sql_engine, "Runs SQL and receives result sets")
+Rel(metadata_explorer, sql_engine, "Reads metadata catalogs")
+Rel(reporting_layer, demo_artifacts, "Uses prompts and query templates")
+Rel(reporting_layer, user, "Presents findings and next actions")
+Rel(query_runner, reporting_layer, "Passes tabular outputs")
+
+SHOW_LEGEND()
+@enduml
